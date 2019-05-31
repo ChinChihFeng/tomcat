@@ -1,0 +1,26 @@
+# Systemd unit file for tomcat
+[Unit]
+Description=Apache Tomcat Web Application Container
+After=syslog.target network.target
+
+[Service]
+Type=forking
+LimitCORE=infinity
+LimitNOFILE=100000
+LimitNPROC=100000
+
+Environment=JAVA_HOME=/usr/java/latest
+Environment=CATALINA_PID={{ tomcat_path }}/temp/tomcat.pid
+Environment=CATALINA_HOME={{ tomcat_path }}
+Environment=CATALINA_BASE={{ tomcat_path }}
+Environment='CATALINA_OPTS=-server -Xss256k -Xms{{ ansible_memtotal_mb // 2 | int }}m -Xmx{{ ansible_memtotal_mb // 2 | int }}m -verbose:gc -Xloggc:${CATALINA_HOME}/logs/gc.log -Djava.awt.headless=true -XX:+UseNUMA -XX:+PrintGCDetails -XX:+DisableExplicitGC -XX:+PrintGCApplicationStoppedTime -XX:+UseG1GC -XX:MaxGCPauseMillis=500 -XX:G1HeapRegionSize=32M -XX:MetaspaceSize=256m -XX:MaxMetaspaceSize=512m -XX:+ParallelRefProcEnabled -XX:PerfDataSamplingInterval=500 -Djava.awt.headless=true -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.authenticate=true -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.access.file=${CATALINA_HOME}/conf/jmxremote.access -Dcom.sun.management.jmxremote.password.file=${CATALINA_HOME}/conf/jmxremote.password -Djava.rmi.server.hostname={{ ansible_default_ipv4.address }} -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath={{ tomcat_path }}/logs'
+Environment='JAVA_OPTS=-Djava.awt.headless=true -Djava.security.egd=file:/dev/./urandom'
+
+ExecStart=/opt/tomcat/bin/startup.sh
+ExecStop=/bin/kill -15 $MAINPID
+
+User={{ tomcat_user }}
+Group={{ tomcat_user }}
+
+[Install]
+WantedBy=multi-user.target

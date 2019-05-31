@@ -1,0 +1,18 @@
+---
+# Here is define variables related with Java.
+tomcat_version: '8.5.29'
+tomcat_user: tomcat
+tomcat_path: /opt/tomcat
+tomcat_jmx_password: password
+
+# Here is define variables related with APR
+apr_version: '1.6.5'
+
+# Here is define variables related with OpenSSL
+openssl_version: '1.1.0e'
+openssl_path: /usr/local/openssl
+
+# Here is define variables related with Tomcat Connector
+enable_APR: true
+enable_threadpool: true
+

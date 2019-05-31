@@ -1,0 +1,1 @@
+packages: ["wget", "gcc", "make", "rpm-build", "autoconf", "libtool", "doxygen", "libuuid-devel", "zlib-devel"]

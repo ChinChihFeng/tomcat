@@ -1,0 +1,221 @@
+---
+- name: Create Tomcat user
+  user: 
+    name: "{{ tomcat_user }}"
+    shell: /bin/nologin
+    createhome: no
+  tags:
+    - package
+
+- name: Download binary distribution from the website
+  get_url:
+    url: http://archive.apache.org/dist/tomcat/tomcat-8/v{{ tomcat_version }}/bin/apache-tomcat-{{ tomcat_version }}.tar.gz
+    dest: /tmp/apache-tomcat-{{ tomcat_version }}.tar.gz
+    mode: 0755
+  tags:
+    - package
+
+- name: Create a tomcat directory
+  file:
+    path: "{{ tomcat_path }}"
+    state: directory
+    mode: 0755
+    owner: "{{ tomcat_user }}"
+    group: "{{ tomcat_user }}"
+  tags:
+    - package
+
+- name: Install Tomcat 
+  command: tar -zxv -f /tmp/apache-tomcat-{{ tomcat_version }}.tar.gz -C "{{ tomcat_path }}" --strip-components=1
+  tags:
+    - package
+
+- name: Update tomcat permissions
+  file:
+    path: "{{ tomcat_path }}"
+    owner: "{{ tomcat_user }}"
+    group: "{{ tomcat_user }}"
+    recurse: yes
+  tags:
+    - package
+
+- name: Update logs directory permission
+  file: 
+    path: "{{ tomcat_path }}/logs"
+    mode: 0755
+  tags:
+    - package
+
+- name: Copy systemd file to destination
+  template: 
+    src: tomcat.service 
+    dest: /etc/systemd/system/tomcat.service
+  tags:
+    - package
+
+- name: Setting JMX access permission
+  copy:
+    src: jmxremote.access
+    dest: "{{ tomcat_path }}/conf/jmxremote.access"
+    owner: "{{ tomcat_user }}"
+    group: "{{ tomcat_user }}"
+    mode: 0644
+  tags:
+    - config
+
+- name: Setting JMX access password
+  template: 
+    src: jmxremote.password
+    dest: "{{ tomcat_path }}/conf/jmxremote.password"
+    owner: "{{ tomcat_user }}"
+    group: "{{ tomcat_user }}"
+    mode: 0400
+  tags:
+    - config
+
+- name: Update service permission
+  file: 
+    path: /etc/systemd/system/tomcat.service
+    mode: 0644 
+  tags:
+    - package
+
+- name: Enable ipv6 on this host
+  sysctl:
+    name: "{{ item }}"
+    value: 0
+  with_items:
+    - net.ipv6.conf.all.disable_ipv6
+    - net.ipv6.conf.default.disable_ipv6
+  tags:
+    - package
+    - config
+
+- name: YUM install packages needed
+  yum: 
+    name: "{{ packages }}"
+    state: latest
+  tags:
+    - package
+
+- name: Download APR souce from the website
+  get_url:
+    url: http://apache.stu.edu.tw/apr/apr-{{ apr_version }}.tar.bz2
+    dest: /tmp
+    mode: 0755
+  tags:
+    - package
+
+- name: Building APR RPMs
+  command: chdir=/tmp rpmbuild -tb apr-{{ apr_version }}.tar.bz2
+
+- name: Installing APR from RPMs
+  yum:
+    name: "/root/rpmbuild/RPMS/x86_64/{{ item }}"
+    state: present
+  with_items:
+    - apr-{{ apr_version }}-1.x86_64.rpm
+    - apr-debuginfo-{{ apr_version }}-1.x86_64.rpm
+    - apr-devel-{{ apr_version }}-1.x86_64.rpm
+  tags:
+    - package
+
+- name: Download Openssl tarball {{ openssl_version }}
+  get_url: 
+    url: https://www.openssl.org/source/openssl-{{ openssl_version }}.tar.gz
+    dest: /tmp
+  tags:
+    - package
+
+- name: Untar Openssl source package {{ openssl_version }}
+  unarchive: 
+    src: "/tmp/openssl-{{ openssl_version }}.tar.gz"
+    dest: /tmp
+    copy: no
+  tags:
+    - package
+
+- name: Unpack Openssl source package (1)
+  command: chdir=/tmp/openssl-{{ openssl_version }} ./config --prefix={{ openssl_path }} shared zlib-dynamic
+  tags:
+    - package
+
+- name: Unpack Openssl source package (2)
+  command: chdir=/tmp/openssl-{{ openssl_version }} make
+  ignore_errors: True
+  tags:
+    - package
+
+- name: Unpack Openssl source package (3)
+  command: chdir=/tmp/openssl-{{ openssl_version }} make install
+  tags:
+    - package
+
+- name: Unpack native tomcat
+  command: chdir={{ tomcat_path }}/bin/ tar -zxv -f {{ tomcat_path }}/bin/tomcat-native.tar.gz
+  tags:
+    - package
+
+- name: Find the directory which is named
+  find:
+    paths: "{{ tomcat_path }}/bin/"
+    patterns: "tomcat-native*"
+    file_type: directory
+  register: find_native
+  tags:
+    - package
+
+- name: Install native tomcat (1)
+  command: chdir={{ item.path }}/native ./configure --with-apr=/usr/bin/apr-1-config --with-java-home=/usr/java/default/ --with-ssl={{ openssl_path }} --prefix={{ tomcat_path }}
+  with_items: "{{ find_native.files }}"
+  tags:
+    - package
+
+- name: Install native tomcat (2)
+  command: chdir={{ item.path }}/native make
+  with_items: "{{ find_native.files }}"
+  tags:
+    - package
+
+- name: Install native tomcat (3)
+  command: chdir={{ item.path }}/native make install
+  with_items: "{{ find_native.files }}"
+  tags:
+    - package
+
+- name: Setting up the library path within the envionment
+  copy:
+    src: setenv.sh
+    dest: "{{ tomcat_path}}/bin"
+    owner: "{{ tomcat_user }}"
+    group: "{{ tomcat_user }}"
+    mode: 0755
+  tags:
+    - package
+
+- name: Delete the packages which are download from the Internet
+  file:
+    path: /tmp/apache-tomcat-{{ tomcat_version }}.tar.gz
+    state: absent
+  tags:
+    - package
+
+- name: Setting the directives in the configuration
+  template:
+    src: server.xml.j2
+    dest: "{{ tomcat_path }}/conf/server.xml"
+    owner: "{{ tomcat_user }}"
+    group: "{{ tomcat_user }}"
+    mode: 0600
+  tags:
+    - config
+
+- name: Enable tomcat service
+  service: 
+    name: tomcat
+    enabled: yes
+  notify:
+    - Restart tomcat
+  tags:
+    - package
+    - config

@@ -1,0 +1,23 @@
+---
+sudo: required
+
+services:
+  - docker
+
+before_install:
+  # Fetch base image for testing
+  - sudo docker pull uriahfeng/docker-jenkins-slave
+
+script:
+  # Run container in detached state
+  - sudo docker run --detach --privileged --volume="${PWD}":/etc/ansible/roles/tomcat:ro --volume=/sys/fs/cgroup:/sys/fs/cgroup:ro uriahfeng/docker-jenkins-slave /usr/lib/systemd/systemd > /tmp/container_id
+
+  # Check syntax of ansible playbook
+  - sudo docker exec "$(cat /tmp/container_id)" ansible-playbook /etc/ansible/roles/tomcat/tests/test.yml --syntax-check
+  # Run ansible playbook
+  - sudo docker exec "$(cat /tmp/container_id)" ansible-playbook /etc/ansible/roles/tomcat/tests/test.yml
+  # Clean up
+  - sudo docker stop "$(cat /tmp/container_id)"
+
+notifications:
+  webhooks: https://galaxy.ansible.com/api/v1/notifications/

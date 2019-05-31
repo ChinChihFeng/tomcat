@@ -1,0 +1,4 @@
+localhost ansible_connection=local
+
+### This block is used to deploy by Vagrant ###
+#default ansible_ssh_host=127.0.0.1 ansible_ssh_port=2222 ansible_ssh_user='vagrant'
