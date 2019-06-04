@@ -37,7 +37,7 @@ RUN echo -e '[local]\nlocalhost ansible_connection=local' > /etc/ansible/hosts
 
 # Start to install tomcat by Ansible
 RUN git clone -b develop https://github.com/ChinChihFeng/tomcat.git /etc/ansible/roles/tomcat; \
-    ansible-playbook /etc/ansible/roles/nginx/tomcat/test.yml --syntax-check; \
+    ansible-playbook /etc/ansible/roles/tomcat/tests/test.yml --syntax-check; \
     ansible all -m setup -i /etc/ansible/roles/tomcat/tests/inventory; \
     ansible-playbook /etc/ansible/roles/tomcat/tests/test.yml
 

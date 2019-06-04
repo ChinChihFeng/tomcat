@@ -107,19 +107,54 @@
   tags:
     - package
 
-- name: Building APR RPMs
-  command: chdir=/tmp rpmbuild -tb apr-{{ apr_version }}.tar.bz2
-
-- name: Installing APR from RPMs
-  yum:
-    name: "/root/rpmbuild/RPMS/x86_64/{{ item }}"
-    state: present
-  with_items:
-    - apr-{{ apr_version }}-1.x86_64.rpm
-    - apr-debuginfo-{{ apr_version }}-1.x86_64.rpm
-    - apr-devel-{{ apr_version }}-1.x86_64.rpm
+- name: Untar APR source package
+  unarchive:
+    src: /tmp/apr-{{ apr_version }}.tar.bz2
+    dest: /tmp
+    remote_src: yes
   tags:
     - package
+    
+- name: Setting parameter with APR from source code, disable ipv6 if env is in container
+  shell: |
+    ./configure --disable-ipv6
+  args:
+    chdir: "/tmp/apr-{{ apr_version }}"
+  when: ansible_virtualization_type == 'docker'
+  tags:
+    - package
+  
+- name: Setting parameter APR from source code
+  shell: |
+    ./configure
+  args:
+    chdir: "/tmp/apr-{{ apr_version }}"
+  when: ansible_virtualization_type != 'docker'
+  tags:
+    - package
+    
+- name: Compile nginx from source
+  shell: |
+    make 
+    make install
+  args:
+    chdir: "/tmp/apr-{{ apr_version }}"
+  tags:
+    - package
+    
+#- name: Building APR RPMs
+#  command: chdir=/tmp rpmbuild -tb apr-{{ apr_version }}.tar.bz2
+  
+#- name: Installing APR from RPMs
+#  yum:
+#    name: "/root/rpmbuild/RPMS/x86_64/{{ item }}"
+#    state: present
+#  with_items:
+#    - apr-{{ apr_version }}-1.x86_64.rpm
+#    - apr-debuginfo-{{ apr_version }}-1.x86_64.rpm
+#    - apr-devel-{{ apr_version }}-1.x86_64.rpm
+#  tags:
+#    - package
 
 - name: Download Openssl tarball {{ openssl_version }}
   get_url: 
@@ -167,7 +202,7 @@
     - package
 
 - name: Install native tomcat (1)
-  command: chdir={{ item.path }}/native ./configure --with-apr=/usr/bin/apr-1-config --with-java-home=/usr/java/default/ --with-ssl={{ openssl_path }} --prefix={{ tomcat_path }}
+  command: chdir={{ item.path }}/native ./configure --with-apr=/usr/local/apr/bin/apr-1-config --with-java-home=/usr/java/default/ --with-ssl={{ openssl_path }} --prefix={{ tomcat_path }}
   with_items: "{{ find_native.files }}"
   tags:
     - package
@@ -217,6 +252,7 @@
     enabled: yes
   notify:
     - Restart tomcat
+  when: ansible_virtualization_type != 'docker'
   tags:
     - package
     - config
